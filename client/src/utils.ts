@@ -177,27 +177,32 @@ export const  diffOperation =(oldText: string, newText: string): LocalOp | null 
   
 
  export function transformOpIndex(localOp: Operation, remoteOp: Operation): Operation {
-    // Simplified rules for insert/delete OT
-    const result = { ...localOp };
-  
-    if (remoteOp.kind === "insert") {
-      if (remoteOp.index <= result.index) {
-        result.index += remoteOp.text?.length || 0;
+    // Transform a local operation's index (and span) through a remote op.
+    // This version properly accounts for invert and replace by reusing the
+    // cursor transformation logic.
+    const result: Operation = { ...localOp };
+
+    // Compute the span removed by the local operation (0 for insert)
+    const normalizeToLF = (s: string): string => s.replace(/\r\n/g, "\n");
+    const localRemovedLen = (() => {
+      if (localOp.kind === "delete" || localOp.kind === "replace") {
+        if (localOp.prevText) return normalizeToLF(localOp.prevText).length;
+        return localOp.length || 0;
       }
+      return 0;
+    })();
+
+    // Transform both the start and end of the local op's span
+    const newStart = transformCursorForOperation(localOp.index, remoteOp);
+    const newEnd = transformCursorForOperation(localOp.index + localRemovedLen, remoteOp);
+
+    result.index = newStart;
+
+    if (localOp.kind === "delete" || localOp.kind === "replace") {
+      const newLen = Math.max(0, newEnd - newStart);
+      result.length = newLen;
     }
-  
-    if (remoteOp.kind === "delete") {
-      if (remoteOp.index < result.index) {
-        result.index -= Math.min(remoteOp.length || 0, result.index - remoteOp.index);
-      } else if (
-        remoteOp.index < result.index + (result.length || 0)
-      ) {
-        // Overlap adjustment
-        result.length =
-          (result.length || 0) - Math.min(remoteOp.length || 0, result.index + (result.length || 0) - remoteOp.index);
-      }
-    }
-  
+
     return result;
   }
   

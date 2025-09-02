@@ -209,12 +209,6 @@ export default function Block() {
     broadcastCurrentPresence();
   }, [broadcastCurrentPresence]);
 
-  const handleBlur = useCallback(() => {
-    isFocusedRef.current = false;
-    suppressSelectionBroadcastFor(300);
-    dispatch(removePresenceAndBroadcast());
-  }, [dispatch, suppressSelectionBroadcastFor]);
-
   useEffect(() => {
     const onSelectionChange = () => {
       if (suppressSelectionBroadcastRef.current) return;
@@ -246,7 +240,6 @@ export default function Block() {
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         onFocus={handleFocus}
-        // onBlur={handleBlur}
       />
 
       {/* Remote cursors overlay */}
