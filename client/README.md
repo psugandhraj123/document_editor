@@ -80,75 +80,12 @@ npm run lint
 
 Runs ESLint to check code quality and consistency.
 
-## Project Structure
-
-```
-client/
-├── src/
-│   ├── app/              # Redux store configuration
-│   ├── components/       # Reusable React components
-│   ├── lib/             # Utility libraries and helpers
-│   ├── types/           # TypeScript type definitions
-│   ├── config/          # Configuration files
-│   ├── assets/          # Static assets
-│   ├── App.tsx          # Main application component
-│   ├── main.tsx         # Application entry point
-│   └── utils.ts         # Utility functions
-├── public/              # Public static files
-├── package.json         # Dependencies and scripts
-├── vite.config.ts       # Vite configuration
-├── tailwind.config.js   # Tailwind CSS configuration
-└── tsconfig.json        # TypeScript configuration
-```
-
-## Key Components
-
-### App.tsx
-The main application component that manages:
-- WebSocket connection to the server
-- Document state and operations
-- User presence and cursor tracking
-- Real-time collaboration features
-
-### Redux Store
-Manages application state including:
-- Document content and version
-- User presence information
-- Pending operations
-- Connection status
-
-### WebSocket Communication
-Handles real-time communication with the server:
-- Document operations (insert, delete, replace)
-- User presence updates
-- Document snapshots
-- Error handling and reconnection
-
-## Collaboration Features
-
-### Real-time Editing
-- Type in the editor and see changes appear instantly for all connected users
-- Automatic conflict resolution using operational transformation
-- Version-based synchronization to handle network issues
-
-### User Presence
-- See who else is currently editing the document
-- View real-time cursor positions with user colors
-- Typing indicators show when others are actively editing
-
-### Document Operations
-The client supports three types of operations:
-- **Insert**: Add text at a specific position
-- **Delete**: Remove text from a specific range
-- **Replace**: Replace text in a specific range
-
-## Testing Collaboration
+## Quick Test
 
 1. Start the server (see server README)
 2. Start the client: `npm run dev`
-3. Open multiple browser tabs to `http://localhost:5173`
-4. Start typing in different tabs to see real-time collaboration
-5. Try editing the same text simultaneously to test conflict resolution
+3. Open two browser tabs to `http://localhost:5173`
+4. Type in either tab and observe real-time updates
 
 ## Development Tips
 
@@ -184,12 +121,38 @@ The client supports three types of operations:
 - Verify WebSocket connection status
 - Monitor Redux state for unexpected changes
 
-## Contributing
+## Simulating Two Users
 
-1. Follow the existing code style and TypeScript patterns
-2. Add proper type definitions for new features
-3. Test collaboration features with multiple browser tabs
-4. Update this README for any new features or changes
+You can test collaboration in two ways:
+
+1) Different accounts
+- Register two separate users via the built-in auth UI
+- Login in two different browsers or two different profiles (e.g., Chrome Profile A and Profile B)
+- Both users will appear with distinct names and independent cursors
+
+2) Same account in two tabs
+- Open two tabs or windows of the same browser
+- Login with the same account in both tabs
+- Each tab generates its own session id (stored in `sessionStorage` as `editorSessionId`) so they behave as two distinct collaborators
+
+Notes
+- Presence is keyed by session id, not just user id. Multiple tabs for the same user are treated as separate participants.
+- To clean up a tab's presence, close the tab or navigate away; the server and client broadcast presence removal for that session id.
+
+## Assumptions
+
+- Authentication is handled by the app’s simple in-memory user store on the server. Tokens are short-lived (24 hours) and stored in `localStorage` on the client.
+- A single default document is used (`default-doc`). There is no document list or multi-document routing.
+- WebSocket URL and REST API base URL are configured via `VITE_WS_URL` and `VITE_BACKEND_URL` (defaults: `ws://localhost:8080` and `http://localhost:8080`).
+- Presence and cursor overlays assume a single block, plaintext editing experience.
+
+## Limitations
+
+- In-memory storage only: Users, document content, and presence reset on server restart.
+- Single-document editor: No per-document permissions, no multi-doc navigation.
+- Simplified OT: Concurrent edits are applied optimistically with minimal transformation; complex conflict scenarios may produce unexpected cursor shifts.
+- No persistence or history timeline: Undo/redo is local to the session; there is no version history across sessions.
+- Basic security: No rate limiting, coarse CORS defaults, and no HTTPS configuration. Production hardening is required.
 
 ## License
 
