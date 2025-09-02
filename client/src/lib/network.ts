@@ -43,7 +43,7 @@ export class NetworkClient {
   private reconnectAttempts = 0;
   private backoffBase = 1000; // 1s
   private backoffMax = 10000; // 10s
-  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private heartbeatInterval: number | null = null;
   private outboundQueue: WSEnvelope[] = [];
   private sentOpIds: Set<string> = new Set();
 
