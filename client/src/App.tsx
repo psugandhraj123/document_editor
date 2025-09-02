@@ -3,7 +3,7 @@ import Editor from './components/Editor'
 import AuthWrapper from './components/AuthWrapper'
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { logout, applyThirdPartyOperation, transformHistoryForThirdPartyOperation, updateUserPresence, updateUsersPresenceBulk } from './app/slice'
+import { logout, applyThirdPartyOperation, transformHistoryForThirdPartyOperation, updateUserPresence, updateUsersPresenceBulk, removePresenceBySessionId } from './app/slice'
 import { setNetworkClient, setDocumentWithHistoryClear } from './app/thunks'
 import type { AppDispatch, RootState } from './app/store'
 import { config } from './config/env'
@@ -60,6 +60,21 @@ function App() {
         // Set the network client in the slice so thunk actions can use it
         setNetworkClient(network);
         
+        // Fetch current presence via REST and seed the presence store
+        try {
+          const presenceRes = await fetch(`${config.backendUrl}/api/presence`, {
+            headers: getAuthHeaders(token)
+          });
+          if (presenceRes.ok) {
+            const presences = await presenceRes.json();
+            if (Array.isArray(presences)) {
+              dispatch(updateUsersPresenceBulk(presences));
+            }
+          }
+        } catch (presenceErr) {
+          console.warn('Failed to fetch presence:', presenceErr);
+        }
+
         // Connect the network
         network.connect();
         
@@ -77,6 +92,7 @@ function App() {
             // Handle presence updates (single or array)
             try {
               const payload = envelope.payload;
+
               if (Array.isArray(payload)) {
                 dispatch(updateUsersPresenceBulk(payload));
               } else {
@@ -84,6 +100,16 @@ function App() {
               }
             } catch (error) {
               console.error("Failed to handle presence update:", error, envelope.payload);
+            }
+          } else if (envelope.type === "PRESENCE_REMOVE") {
+            try {
+
+              const { sessionId } = envelope.payload || {};
+              if (sessionId) {
+                dispatch(removePresenceBySessionId(sessionId));
+              }
+            } catch (error) {
+              console.error("Failed to handle presence removal:", error, envelope.payload);
             }
           }
         });

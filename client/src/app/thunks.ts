@@ -1,5 +1,5 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { applyOperation, addToUndo, addToRedo, popFromUndo, popFromRedo, setDocument, clearHistory, clearRedo, updateUsersPresenceBulk, updatePresence } from "./slice";
+import { applyOperation, addToUndo, addToRedo, popFromUndo, popFromRedo, setDocument, clearHistory, clearRedo, updateUsersPresenceBulk, updatePresence, removeCurrentPresence } from "./slice";
 import { getFinalCursor, getOperationRange, transformCursorForOperation } from "../utils";
 import type { Operation } from "../types/models";
 import type { NetworkClient } from "../lib/network";
@@ -11,11 +11,21 @@ export const setNetworkClient = (client: NetworkClient) => {
   networkClient = client;
 };
 
+// Remove current session presence locally and broadcast removal to server
+export const removePresenceAndBroadcast = () => (dispatch: any) => {
+  const sessionId = sessionStorage.getItem('editorSessionId');
+  console.log('Removing presence for sessionId:', sessionId);
+  dispatch(removeCurrentPresence());
+  if (networkClient && sessionId) {
+    networkClient.sendEnvelope("PRESENCE_REMOVE", { sessionId });
+  }
+};
+
 // Build, apply locally, and broadcast bulk presence changes for an operation
-function computeAndBroadcastBulkPresence(
+export function computeAndBroadcastBulkPresence(
   dispatch: any,
   getState: any,
-  operation: Operation,
+  operation: Operation | null | undefined,
   finalCursor: number,
   opRange: { start: number; end: number }
 ) {
@@ -27,13 +37,15 @@ function computeAndBroadcastBulkPresence(
 
   const bulk: Array<{ userId: string; name: string; sessionId: string; cursor: number; opStart?: number; opEnd?: number; lastSeen?: number }> = [];
 
-  // Others adjusted through the operation
-  for (const p of Object.values(presenceState)) {
-    if (!p) continue;
-    if (mySessionId && p.sessionId === mySessionId) continue;
-    const newCursor = transformCursorForOperation(p.cursor ?? 0, operation);
-    if (newCursor !== p.cursor) {
-      bulk.push({ userId: p.userId, name: p.name, sessionId: p.sessionId, cursor: newCursor, lastSeen: Date.now() });
+  // Adjust other sessions only when there is a real operation and it spans a range
+  if (operation && opRange.end > opRange.start) {
+    for (const p of Object.values(presenceState)) {
+      if (!p) continue;
+      if (mySessionId && p.sessionId === mySessionId) continue;
+      const newCursor = transformCursorForOperation(p.cursor ?? 0, operation);
+      if (newCursor !== p.cursor) {
+        bulk.push({ userId: p.userId, name: p.name, sessionId: p.sessionId, cursor: newCursor, lastSeen: Date.now() });
+      }
     }
   }
 

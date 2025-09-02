@@ -5,6 +5,7 @@ export type EnvelopeType =
   | "HELLO"
   | "OP"
   | "PRESENCE"
+  | "PRESENCE_REMOVE"
   | "SNAPSHOT"
   | "REQUEST_SNAPSHOT"
   | "ACK"
@@ -43,7 +44,7 @@ export class NetworkClient {
   private reconnectAttempts = 0;
   private backoffBase = 1000; // 1s
   private backoffMax = 10000; // 10s
-  private heartbeatInterval: number | null = null;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private outboundQueue: WSEnvelope[] = [];
   private sentOpIds: Set<string> = new Set();
 

@@ -26,6 +26,8 @@ let document: Document = {
 const clients = new Set<WebSocket>();
 // Store user presence information by sessionId
 const userPresence = new Map<string, Presence>();
+// Track which sessionIds belong to which WebSocket connection
+const wsToSessionIds = new Map<WebSocket, Set<string>>();
 
 // -----------------------------
 // Server setup
@@ -45,6 +47,12 @@ app.use("/api/auth", authRoutes);
 // Protected document endpoint
 app.get("/api/document", authMiddleware, (_, res) => {
   res.json(document);
+});
+
+// Protected presence endpoint - returns current presence as an array
+app.get("/api/presence", authMiddleware, (_req, res) => {
+  const allPresence = Array.from(userPresence.values());
+  res.json(allPresence);
 });
 
 const server = http.createServer(app);
@@ -144,24 +152,48 @@ wss.on("connection", (ws: WebSocket, req) => {
 
       // PRESENCE - Update user presence and broadcast to others
       if (msg.type === "PRESENCE") {
-        const presence: Presence = msg.payload;
-        
-        // Ensure presence has required fields
-        if (!presence.userId) presence.userId = payload.userId;
-        if (!presence.name) presence.name = payload.name;
-        if (!presence.sessionId) {
-          // Generate a session ID if not provided
-          presence.sessionId = `${payload.userId}-${Date.now()}`;
+        const presence: Presence[] = msg.payload;
+      
+        for (const p of presence) {
+          userPresence.set(p.sessionId, p);
         }
-        
-        // Store the presence by sessionId
-        userPresence.set(presence.sessionId, presence);
+
+        // Track sessions owned by this websocket (for this authenticated user)
+        let owned = wsToSessionIds.get(ws);
+        if (!owned) {
+          owned = new Set<string>();
+          wsToSessionIds.set(ws, owned);
+        }
+        for (const p of presence) {
+          if (p.userId === payload.userId) {
+            owned.add(p.sessionId);
+          }
+        }
         
         // Broadcast to other clients
         broadcast(ws, { type: "PRESENCE", payload: presence });
         
         // Send ACK
-        send(ws, "ACK", { presenceId: presence.sessionId }, msg.requestId);
+        if (presence[0]) {
+          send(ws, "ACK", { presenceId: presence[0].sessionId }, msg.requestId);
+        } else {
+          send(ws, "ACK", { presenceId: null }, msg.requestId);
+        }
+        return;
+      }
+
+      // PRESENCE_REMOVE - Remove a session's presence and broadcast removal
+      if (msg.type === "PRESENCE_REMOVE") {
+        const { sessionId } = msg.payload || {};
+ 
+        if (sessionId && userPresence.has(sessionId)) {
+          userPresence.delete(sessionId);
+          // Also remove mapping from this connection
+          const owned = wsToSessionIds.get(ws);
+          if (owned) owned.delete(sessionId);
+          broadcast(ws, { type: "PRESENCE_REMOVE", payload: { sessionId } });
+          send(ws, "ACK", { removed: sessionId }, msg.requestId);
+        }
         return;
       }
 
@@ -184,12 +216,17 @@ wss.on("connection", (ws: WebSocket, req) => {
   });
 
   ws.on("close", () => {
-    // Remove user presence when they disconnect
-    // Find and remove all sessions for this user
-    for (const [sessionId, presence] of userPresence.entries()) {
-      if (presence.userId === payload.userId) {
-        userPresence.delete(sessionId);
+    // Remove only sessions associated with this specific websocket
+    const owned = wsToSessionIds.get(ws);
+    if (owned) {
+      for (const sessionId of owned) {
+        if (userPresence.has(sessionId)) {
+          userPresence.delete(sessionId);
+          // Broadcast presence removal so clients clear overlays
+          broadcast(ws, { type: "PRESENCE_REMOVE", payload: { sessionId } });
+        }
       }
+      wsToSessionIds.delete(ws);
     }
     clients.delete(ws);
     console.log(`User ${payload.name} disconnected`);

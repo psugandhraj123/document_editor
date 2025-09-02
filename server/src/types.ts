@@ -74,7 +74,7 @@ export interface Operation {
  */
 export interface WSEnvelope {
   /** Type of message being sent */
-  type: 'HELLO' | 'OP' | 'PRESENCE' | 'SNAPSHOT' | 'REQUEST_SNAPSHOT' | 'ACK' | 'ERROR' | 'PING' | 'PONG';
+  type: 'HELLO' | 'OP' | 'PRESENCE' | 'PRESENCE_REMOVE' | 'SNAPSHOT' | 'REQUEST_SNAPSHOT' | 'ACK' | 'ERROR' | 'PING' | 'PONG';
   /** Message payload (type depends on the message type) */
   payload: any;
   /** Optional request ID for request-response pattern */

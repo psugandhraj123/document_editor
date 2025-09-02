@@ -89,7 +89,8 @@ const docSlice = createSlice({
       action: PayloadAction<{ id: string; content: string; version: number }>
     ) => {
       state.id = action.payload.id;
-      state.content = action.payload.content;
+      // Canonicalize to LF to keep indices consistent with editor and utils
+      state.content = action.payload.content.replace(/\r\n/g, "\n");
       state.version = action.payload.version;
     },
 
@@ -98,8 +99,15 @@ const docSlice = createSlice({
       action: PayloadAction<Operation>
     ) => {
       const op = action.payload;
+      // Normalize op text fields and stored content to LF
+      const normalizedOp: Operation = {
+        ...op,
+        text: op.text ? op.text.replace(/\r\n/g, "\n") : op.text,
+        prevText: op.prevText ? op.prevText.replace(/\r\n/g, "\n") : op.prevText,
+      };
+      const current = state.content.replace(/\r\n/g, "\n");
       // Apply the operation to content
-      state.content = applyEdit(state.content, op);
+      state.content = applyEdit(current, normalizedOp);
       state.version++;
     },
 
@@ -108,8 +116,15 @@ const docSlice = createSlice({
       action: PayloadAction<Operation>
     ) => {
       const op = action.payload;
+      // Normalize op text fields and stored content to LF
+      const normalizedOp: Operation = {
+        ...op,
+        text: op.text ? op.text.replace(/\r\n/g, "\n") : op.text,
+        prevText: op.prevText ? op.prevText.replace(/\r\n/g, "\n") : op.prevText,
+      };
+      const current = state.content.replace(/\r\n/g, "\n");
       // Apply the operation to content
-      state.content = applyEdit(state.content, op);
+      state.content = applyEdit(current, normalizedOp);
     },
   },
 });
@@ -241,6 +256,14 @@ const presenceSlice = createSlice({
       }
     },
 
+    // Remove a specific session's presence (used for remote removals)
+    removePresenceBySessionId: (state, action: PayloadAction<string>) => {
+      const sessionId = action.payload;
+      if (sessionId && state[sessionId]) {
+        delete state[sessionId];
+      }
+    },
+
     // Handle incoming presence updates from other users
     updateUserPresence: (state, action: PayloadAction<Presence>) => {
       // Store presence using the sessionId from the incoming data
@@ -274,6 +297,7 @@ export const {
 export const {
   updatePresence,
   removeCurrentPresence,
+  removePresenceBySessionId,
   updateUserPresence,
   updateUsersPresenceBulk
 } = presenceSlice.actions;

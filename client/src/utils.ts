@@ -3,31 +3,34 @@ import type { Operation } from "./types/models";
 type LocalOp = Omit<Operation, 'opId' | 'userId' | 'docId' | 'baseVersion'>;
 
 export const  diffOperation =(oldText: string, newText: string): LocalOp | null =>{
-    if (oldText === newText) return null;
-  
+    // Canonicalize CRLF to LF to keep indices and lengths consistent across platforms
+    const o = oldText.replace(/\r\n/g, "\n");
+    const n = newText.replace(/\r\n/g, "\n");
+    if (o === n) return null;
+
     let start = 0;
     while (
-      start < oldText.length &&
-      start < newText.length &&
-      oldText[start] === newText[start]
+      start < o.length &&
+      start < n.length &&
+      o[start] === n[start]
     ) {
       start++;
     }
-  
-    let oldEnd = oldText.length - 1;
-    let newEnd = newText.length - 1;
+
+    let oldEnd = o.length - 1;
+    let newEnd = n.length - 1;
     while (
       oldEnd >= start &&
       newEnd >= start &&
-      oldText[oldEnd] === newText[newEnd]
+      o[oldEnd] === n[newEnd]
     ) {
       oldEnd--;
       newEnd--;
     }
-  
-    const removed = oldText.slice(start, oldEnd + 1);
-    const added = newText.slice(start, newEnd + 1);
-  
+
+    const removed = o.slice(start, oldEnd + 1);
+    const added = n.slice(start, newEnd + 1);
+
     if (removed && !added) {
       return {
         kind: "delete",
@@ -155,7 +158,7 @@ export const  diffOperation =(oldText: string, newText: string): LocalOp | null 
 
     if (removedLen === 0 && addedLen > 0) {
       // insert
-      if (cursor < index) return cursor;
+      if (cursor <= index) return cursor;
       return cursor + addedLen;
     }
 
