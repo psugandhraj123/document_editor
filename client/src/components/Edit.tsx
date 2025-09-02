@@ -344,9 +344,9 @@ function sessionIdToColors(id: string): { caret: string; labelBg: string; border
     hash |= 0;
   }
   const hue = Math.abs(hash) % 360;
-  const caret = `hsl(${hue}, 48%, 40%)`;
-  const labelBg = `hsl(${hue}, 42%, 28%)`;
-  const border = `hsl(${hue}, 40%, 22%)`;
+  const caret = `hsl(${hue}, 60%, 50%)`;
+  const labelBg = `hsl(${hue}, 55%, 35%)`;
+  const border = `hsl(${hue}, 50%, 25%)`;
   return { caret, labelBg, border };
 }
 
